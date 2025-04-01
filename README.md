@@ -23,7 +23,9 @@ Current configuration:
 
 # systemd service
 
-Save **folowsun.service** to `~/.config/systemd/user/`
+Copy `folowsun.service` to the destination `~/.config/systemd/user/`
+
+and enable and start service
 
 ```bash
 systemctl --user enable folowsun.service
