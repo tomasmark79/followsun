@@ -34,6 +34,5 @@ systemctl --user start followsun.service
 
 status output
 
-```bash
+![image](https://github.com/user-attachments/assets/bf8fd17e-5bf1-4e29-8ad2-90a8c874e774)
 
-```
