@@ -1,15 +1,15 @@
 #!/bin/bash
-# filepath: /home/tomas/dev/bash/folowsun/folowsun.sh
+# filepath: /home/tomas/dev/bash/followsun/followsun.sh
 
-# Folowsun - script to switch GNOME theme based on sunrise/sunset
+# followsun - script to switch GNOME theme based on sunrise/sunset
 # Automatically switches between light and dark mode
 
 # Default location (Prague, CZ)
 DEFAULT_LAT="50.0755"
 DEFAULT_LON="14.4378"
-
+    
 # Configuration file
-CONFIG_DIR="$HOME/.config/folowsun"
+CONFIG_DIR="$HOME/.config/followsun"
 CONFIG_FILE="$CONFIG_DIR/config"
 
 # Create config directory if it doesn't exist
@@ -18,7 +18,7 @@ mkdir -p "$CONFIG_DIR"
 # Create default config if it doesn't exist
 if [ ! -f "$CONFIG_FILE" ]; then
     cat > "$CONFIG_FILE" << EOF
-# Folowsun configuration
+# followsun configuration
 LATITUDE=$DEFAULT_LAT
 LONGITUDE=$DEFAULT_LON
 # Offset in minutes (positive = later, negative = earlier)
@@ -32,7 +32,7 @@ source "$CONFIG_FILE"
 
 # Function to log messages
 log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$CONFIG_DIR/folowsun.log"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$CONFIG_DIR/followsun.log"
     echo "$1"
 }
 
@@ -116,9 +116,9 @@ schedule_theme_change() {
 
 # Function to show help
 show_help() {
-    echo "Folowsun - GNOME theme switcher based on sunrise/sunset"
+    echo "FollowSun - GNOME theme switcher based on sunrise/sunset"
     echo ""
-    echo "Usage: folowsun.sh [OPTION]"
+    echo "Usage: followsun.sh [OPTION]"
     echo ""
     echo "Options:"
     echo "  --help         Show this help"
@@ -138,7 +138,7 @@ show_help() {
 # Function to update config file
 update_config() {
     cat > "$CONFIG_FILE" << EOF
-# Folowsun configuration
+# followsun configuration
 LATITUDE=$LATITUDE
 LONGITUDE=$LONGITUDE
 # Offset in minutes (positive = later, negative = earlier)
@@ -184,7 +184,7 @@ case "$1" in
         schedule_theme_change > /dev/null
         ;;
     --daemon)
-        log "Starting folowsun daemon"
+        log "Starting followsun daemon"
         while true; do
             # Capture only the time value, not the log messages
             NEXT_CHANGE=$(schedule_theme_change | tail -n 1)

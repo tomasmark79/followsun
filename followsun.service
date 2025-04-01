@@ -1,13 +1,13 @@
 [Unit]
-Description=Folowsun - GNOME theme switcher based on sunrise/sunset
+Description=FollowSun - GNOME theme switcher based on sunrise/sunset
 After=graphical-session.target
 PartOf=graphical-session.target
 
 [Service]
 Type=simple
-Environment="CONFIG_DIR=%h/.config/folowsun"
+Environment="CONFIG_DIR=%h/.config/followsun"
 ExecStartPre=/bin/sh -c 'mkdir -p ${CONFIG_DIR}'
-ExecStart=/home/tomas/dev/bash/folowsun/folowsun.sh --daemon
+ExecStart=/home/tomas/dev/bash/followsun/followsun.sh --daemon
 Restart=on-failure
 RestartSec=30
 
