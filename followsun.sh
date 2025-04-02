@@ -7,7 +7,7 @@
 # Default location (Prague, CZ)
 DEFAULT_LAT="50.0755"
 DEFAULT_LON="14.4378"
-    
+
 # Configuration file
 CONFIG_DIR="$HOME/.config/followsun"
 CONFIG_FILE="$CONFIG_DIR/config"
@@ -17,7 +17,7 @@ mkdir -p "$CONFIG_DIR"
 
 # Create default config if it doesn't exist
 if [ ! -f "$CONFIG_FILE" ]; then
-    cat > "$CONFIG_FILE" << EOF
+    cat >"$CONFIG_FILE" <<EOF
 # followsun configuration
 LATITUDE=$DEFAULT_LAT
 LONGITUDE=$DEFAULT_LON
@@ -32,7 +32,7 @@ source "$CONFIG_FILE"
 
 # Function to log messages
 log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$CONFIG_DIR/followsun.log"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >>"$CONFIG_DIR/followsun.log"
     echo "$1"
 }
 
@@ -57,24 +57,24 @@ get_sun_times() {
         log "Error: curl is required but not installed"
         exit 1
     fi
-    
+
     # Get today's date
     local TODAY=$(date +"%Y-%m-%d")
-    
+
     # Use Sunrise-Sunset.org API to get sun times
     local API_URL="https://api.sunrise-sunset.org/json?lat=$LATITUDE&lng=$LONGITUDE&date=$TODAY&formatted=0"
-    
+
     # Get sun times
     local SUN_DATA=$(curl -s "$API_URL")
-    
+
     # Extract times (in UTC)
     local SUNRISE=$(echo "$SUN_DATA" | grep -o '"sunrise":"[^"]*"' | cut -d'"' -f4)
     local SUNSET=$(echo "$SUN_DATA" | grep -o '"sunset":"[^"]*"' | cut -d'"' -f4)
-    
+
     # Convert to local time and apply offset
     SUNRISE_LOCAL=$(date -d "$SUNRISE $SUNRISE_OFFSET minutes" +"%H:%M")
     SUNSET_LOCAL=$(date -d "$SUNSET $SUNSET_OFFSET minutes" +"%H:%M")
-    
+
     echo "$SUNRISE_LOCAL $SUNSET_LOCAL"
 }
 
@@ -83,11 +83,11 @@ schedule_theme_change() {
     local SUN_TIMES=$(get_sun_times)
     local SUNRISE=$(echo "$SUN_TIMES" | cut -d' ' -f1)
     local SUNSET=$(echo "$SUN_TIMES" | cut -d' ' -f2)
-    
+
     local CURRENT_TIME=$(date +"%H:%M")
-    
+
     log "Current time: $CURRENT_TIME, Sunrise: $SUNRISE, Sunset: $SUNSET"
-    
+
     # Determine current expected theme
     if [[ "$CURRENT_TIME" > "$SUNRISE" && "$CURRENT_TIME" < "$SUNSET" ]]; then
         # It's daytime
@@ -109,7 +109,7 @@ schedule_theme_change() {
             NEXT_CHANGE=$(date -d "$SUNRISE_TOMORROW $SUNRISE_OFFSET minutes" +"%H:%M")
         fi
     fi
-    
+
     log "Next theme change scheduled at $NEXT_CHANGE"
     echo "$NEXT_CHANGE"
 }
@@ -137,7 +137,7 @@ show_help() {
 
 # Function to update config file
 update_config() {
-    cat > "$CONFIG_FILE" << EOF
+    cat >"$CONFIG_FILE" <<EOF
 # followsun configuration
 LATITUDE=$LATITUDE
 LONGITUDE=$LONGITUDE
@@ -149,80 +149,44 @@ EOF
 
 # Parse command line arguments
 case "$1" in
-    --help)
-        show_help
-        ;;
-    --set-location)
-        if [ -n "$2" ] && [ -n "$3" ]; then
-            LATITUDE="$2"
-            LONGITUDE="$3"
-            update_config
-            log "Location updated to $LATITUDE, $LONGITUDE"
-        else
-            echo "Error: Latitude and longitude required"
-            exit 1
-        fi
-        ;;
-    --set-offset)
-        if [ -n "$2" ] && [ -n "$3" ]; then
-            SUNRISE_OFFSET="$2"
-            SUNSET_OFFSET="$3"
-            update_config
-            log "Offsets updated to sunrise: $SUNRISE_OFFSET, sunset: $SUNSET_OFFSET"
-        else
-            echo "Error: Sunrise and sunset offsets required"
-            exit 1
-        fi
-        ;;
-    --force-light)
-        set_light_theme
-        ;;
-    --force-dark)
-        set_dark_theme
-        ;;
-    --auto)
-        schedule_theme_change > /dev/null
-        ;;
-    --daemon)
-        log "Starting followsun daemon"
-        while true; do
-            # Capture only the time value, not the log messages
-            NEXT_CHANGE=$(schedule_theme_change | tail -n 1)
-            
-            # For debugging
-            log "Next change time extracted: $NEXT_CHANGE"
-            
-            # Calculate seconds until next change
-            CURRENT_SECONDS=$(date +%s)
-            TARGET_SECONDS=$(date -d "today $NEXT_CHANGE" +%s 2>/dev/null)
-            
-            # If date command failed or time is in the past, try tomorrow
-            if [ $? -ne 0 ] || [ $TARGET_SECONDS -lt $CURRENT_SECONDS ]; then
-                TARGET_SECONDS=$(date -d "tomorrow $NEXT_CHANGE" +%s 2>/dev/null)
-                if [ $? -ne 0 ]; then
-                    # If still failing, use a default wait time
-                    log "Error calculating next change time. Waiting for 1 hour."
-                    NEXT_CHANGE_SECONDS=3600
-                else
-                    NEXT_CHANGE_SECONDS=$((TARGET_SECONDS - CURRENT_SECONDS))
-                fi
-            else
-                NEXT_CHANGE_SECONDS=$((TARGET_SECONDS - CURRENT_SECONDS))
-            fi
-            
-            # Make sure we have a positive wait time
-            if [ $NEXT_CHANGE_SECONDS -le 0 ]; then
-                log "Calculated negative wait time. Defaulting to 1 hour."
-                NEXT_CHANGE_SECONDS=3600
-            fi
-            
-            log "Sleeping for $NEXT_CHANGE_SECONDS seconds until next change"
-            sleep $NEXT_CHANGE_SECONDS
-        done
-        ;;
-    *)
-        show_help
-        ;;
+--help)
+    show_help
+    ;;
+--set-location)
+    if [ -n "$2" ] && [ -n "$3" ]; then
+        LATITUDE="$2"
+        LONGITUDE="$3"
+        update_config
+        log "Location updated to $LATITUDE, $LONGITUDE"
+    else
+        echo "Error: Latitude and longitude required"
+        exit 1
+    fi
+    ;;
+--set-offset)
+    if [ -n "$2" ] && [ -n "$3" ]; then
+        SUNRISE_OFFSET="$2"
+        SUNSET_OFFSET="$3"
+        update_config
+        log "Offsets updated to sunrise: $SUNRISE_OFFSET, sunset: $SUNSET_OFFSET"
+    else
+        echo "Error: Sunrise and sunset offsets required"
+        exit 1
+    fi
+    ;;
+--force-light)
+    set_light_theme
+    ;;
+--force-dark)
+    set_dark_theme
+    ;;
+--auto)
+    schedule_theme_change >/dev/null
+    ;;
+*)
+    show_help
+
+    ;;
 esac
 
 exit 0

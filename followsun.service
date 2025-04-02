@@ -7,7 +7,7 @@ PartOf=graphical-session.target
 Type=simple
 Environment="CONFIG_DIR=%h/.config/followsun"
 ExecStartPre=/bin/sh -c 'mkdir -p ${CONFIG_DIR}'
-ExecStart=/home/tomas/dev/bash/followsun/followsun.sh --daemon
+ExecStart=/home/tomas/dev/bash/followsun/followsun.sh --auto
 Restart=on-failure
 RestartSec=30
 

@@ -25,11 +25,16 @@ Current configuration:
 
 Copy `followsun.service` to the destination `~/.config/systemd/user/`
 
-and enable and start service
+enable and start systemd service and timer
 
 ```bash
+
 systemctl --user enable followsun.service
 systemctl --user start followsun.service
+
+systemctl --user enable followsun.timer
+systemctl --user start followsun.timer
+
 ```
 
 status output
