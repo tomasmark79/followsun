@@ -7,7 +7,7 @@ Usage: followsun.sh [OPTION]
 
 Options:
   --help         Show this help
-  --set-location <LAT> <LON>  Set your latitude and longitude
+  --set-location <LAT> <LON> Set your latitude and longitude
   --set-offset   <SUNRISE_OFFSET> <SUNSET_OFFSET>  Set offsets in minutes
   --force-light  Force light theme
   --force-dark   Force dark theme
@@ -27,9 +27,15 @@ Systemd timer bude spouštět v zadaném intervalu `followsun.sh`. Edit, and cop
 ```bash
 systemctl --user enable followsun.service
 systemctl --user start followsun.service
-
 systemctl --user enable followsun.timer
 systemctl --user start followsun.timer
+systemctl --user daemon-reload
+```
+
+logs
+
+```bash
+journalctl --user-unit=followsun.timer
 ```
 
 
