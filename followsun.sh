@@ -1,6 +1,4 @@
 #!/bin/bash
-# filepath: /home/tomas/dev/bash/followsun/followsun.sh
-
 # followsun - script to switch GNOME theme based on sunrise/sunset
 # Automatically switches between light and dark mode
 
@@ -11,6 +9,9 @@ DEFAULT_LON="14.4378"
 # Configuration file
 CONFIG_DIR="$HOME/.config/followsun"
 CONFIG_FILE="$CONFIG_DIR/config"
+
+# Script directory
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 
 # Create config directory if it doesn't exist
 mkdir -p "$CONFIG_DIR"
@@ -61,19 +62,77 @@ get_sun_times() {
     # Get today's date
     local TODAY=$(date +"%Y-%m-%d")
 
-    # Use Sunrise-Sunset.org API to get sun times
+    # Try to get sun times from API first
     local API_URL="https://api.sunrise-sunset.org/json?lat=$LATITUDE&lng=$LONGITUDE&date=$TODAY&formatted=0"
+    local SUN_DATA=$(curl -s --connect-timeout 5 "$API_URL")
+    
+    # Check if API call was successful
+    if [[ "$SUN_DATA" == *"\"status\":\"OK\""* ]]; then
+        # Extract times (in UTC)
+        local SUNRISE=$(echo "$SUN_DATA" | grep -o '"sunrise":"[^"]*"' | cut -d'"' -f4)
+        local SUNSET=$(echo "$SUN_DATA" | grep -o '"sunset":"[^"]*"' | cut -d'"' -f4)
 
-    # Get sun times
-    local SUN_DATA=$(curl -s "$API_URL")
-
-    # Extract times (in UTC)
-    local SUNRISE=$(echo "$SUN_DATA" | grep -o '"sunrise":"[^"]*"' | cut -d'"' -f4)
-    local SUNSET=$(echo "$SUN_DATA" | grep -o '"sunset":"[^"]*"' | cut -d'"' -f4)
-
-    # Convert to local time and apply offset
-    SUNRISE_LOCAL=$(date -d "$SUNRISE $SUNRISE_OFFSET minutes" +"%H:%M")
-    SUNSET_LOCAL=$(date -d "$SUNSET $SUNSET_OFFSET minutes" +"%H:%M")
+        # Convert to local time and apply offset
+        SUNRISE_LOCAL=$(date -d "$SUNRISE $SUNRISE_OFFSET minutes" +"%H:%M")
+        SUNSET_LOCAL=$(date -d "$SUNSET $SUNSET_OFFSET minutes" +"%H:%M")
+        
+        # Save to cache
+        echo "$SUNRISE_LOCAL $SUNSET_LOCAL $TODAY" > "$CONFIG_DIR/sun_cache"
+        log "Sun times from API: Sunrise: $SUNRISE_LOCAL, Sunset: $SUNSET_LOCAL"
+    else
+        # API failed, try Python script fallback
+        log "Warning: Could not fetch sun times from API. Using fallback calculation."
+        
+        # Check if Python script exists
+        local PYTHON_SCRIPT="$SCRIPT_DIR/sun_calculator.py"
+        if [[ -f "$PYTHON_SCRIPT" && -x "$PYTHON_SCRIPT" ]]; then
+            # Call the Python script
+            if command -v python3 &>/dev/null; then
+                local FALLBACK_RESULT=$("$PYTHON_SCRIPT" "$LATITUDE" "$LONGITUDE" "$SUNRISE_OFFSET" "$SUNSET_OFFSET")
+                local SOURCE=$(echo "$FALLBACK_RESULT" | cut -d' ' -f1)
+                SUNRISE_LOCAL=$(echo "$FALLBACK_RESULT" | cut -d' ' -f2)
+                SUNSET_LOCAL=$(echo "$FALLBACK_RESULT" | cut -d' ' -f3)
+                
+                log "Using $SOURCE sun times: Sunrise: $SUNRISE_LOCAL, Sunset: $SUNSET_LOCAL"
+                
+                # Save to cache
+                echo "$SUNRISE_LOCAL $SUNSET_LOCAL $TODAY" > "$CONFIG_DIR/sun_cache"
+            else
+                log "Python 3 not found. Checking for cached values."
+            fi
+        else
+            log "Fallback script not found. Checking for cached values."
+        fi
+        
+        # If we don't have values yet, try the cache
+        if [[ -z "$SUNRISE_LOCAL" || -z "$SUNSET_LOCAL" ]]; then
+            if [[ -f "$CONFIG_DIR/sun_cache" ]]; then
+                local CACHE_DATE=$(awk '{print $3}' "$CONFIG_DIR/sun_cache" 2>/dev/null)
+                # Only use cache if it's from today or yesterday
+                if [[ "$CACHE_DATE" == "$TODAY" || "$CACHE_DATE" == "$(date -d 'yesterday' +%Y-%m-%d)" ]]; then
+                    SUNRISE_LOCAL=$(awk '{print $1}' "$CONFIG_DIR/sun_cache" 2>/dev/null)
+                    SUNSET_LOCAL=$(awk '{print $2}' "$CONFIG_DIR/sun_cache" 2>/dev/null)
+                    log "Using cached sun times: Sunrise: $SUNRISE_LOCAL, Sunset: $SUNSET_LOCAL"
+                fi
+            fi
+        fi
+        
+        # If we still don't have values, use reasonable defaults for central Europe
+        if [[ -z "$SUNRISE_LOCAL" || -z "$SUNSET_LOCAL" ]]; then
+            local MONTH=$(date +%m)
+            # Seasonal defaults
+            if [[ "$MONTH" -ge 4 && "$MONTH" -le 9 ]]; then
+                # Spring/Summer
+                SUNRISE_LOCAL="05:30"
+                SUNSET_LOCAL="20:30"
+            else
+                # Fall/Winter
+                SUNRISE_LOCAL="07:00"
+                SUNSET_LOCAL="16:30"
+            fi
+            log "Using default seasonal sun times: Sunrise: $SUNRISE_LOCAL, Sunset: $SUNSET_LOCAL"
+        fi
+    fi
 
     echo "$SUNRISE_LOCAL $SUNSET_LOCAL"
 }
@@ -101,12 +160,18 @@ schedule_theme_change() {
         local NEXT_CHANGE=$SUNRISE
         # If we already passed sunrise today, schedule for tomorrow
         if [[ "$CURRENT_TIME" < "$SUNSET" ]]; then
-            # Calculate tomorrow's sunrise
+            # Try API first for tomorrow's sunrise
             local TOMORROW=$(date -d "tomorrow" +"%Y-%m-%d")
             local API_URL="https://api.sunrise-sunset.org/json?lat=$LATITUDE&lng=$LONGITUDE&date=$TOMORROW&formatted=0"
-            local SUN_DATA=$(curl -s "$API_URL")
-            local SUNRISE_TOMORROW=$(echo "$SUN_DATA" | grep -o '"sunrise":"[^"]*"' | cut -d'"' -f4)
-            NEXT_CHANGE=$(date -d "$SUNRISE_TOMORROW $SUNRISE_OFFSET minutes" +"%H:%M")
+            local SUN_DATA=$(curl -s --connect-timeout 5 "$API_URL")
+            
+            if [[ "$SUN_DATA" == *"\"status\":\"OK\""* ]]; then
+                local SUNRISE_TOMORROW=$(echo "$SUN_DATA" | grep -o '"sunrise":"[^"]*"' | cut -d'"' -f4)
+                NEXT_CHANGE=$(date -d "$SUNRISE_TOMORROW $SUNRISE_OFFSET minutes" +"%H:%M")
+            else
+                # API failed, just add 24 hours to today's sunrise as an estimate
+                NEXT_CHANGE=$(date -d "$SUNRISE 24 hours" +"%H:%M")
+            fi
         fi
     fi
 
@@ -122,11 +187,12 @@ show_help() {
     echo ""
     echo "Options:"
     echo "  --help         Show this help"
-    echo "  --set-location <LAT <LON> Set your latitude and longitude"
+    echo "  --set-location <LAT> <LON> Set your latitude and longitude"
     echo "  --set-offset   <SUNRISE_OFFSET> <SUNSET_OFFSET> Set offsets in minutes"
     echo "  --force-light  Force light theme"
     echo "  --force-dark   Force dark theme"
     echo "  --auto         Apply the appropriate theme based on current time"
+    echo "  --install-fallback Install Python fallback calculator"
     echo ""
     echo "Current configuration:"
     echo "  Location: $LATITUDE, $LONGITUDE"
@@ -144,6 +210,201 @@ LONGITUDE=$LONGITUDE
 SUNRISE_OFFSET=$SUNRISE_OFFSET
 SUNSET_OFFSET=$SUNSET_OFFSET
 EOF
+}
+
+# Function to install Python fallback script
+install_fallback() {
+    local PYTHON_SCRIPT="$SCRIPT_DIR/sun_calculator.py"
+    
+    # Check if Python 3 is installed
+    if ! command -v python3 &>/dev/null; then
+        log "Error: Python 3 is required for the fallback calculator but not installed"
+        exit 1
+    fi
+    
+    # Create the Python script
+    cat > "$PYTHON_SCRIPT" <<"EOF"
+#!/usr/bin/env python3
+"""
+Sun Calculator - Calculate sunrise and sunset times for a given location
+Used by followsun.sh when internet connection is unavailable
+"""
+
+import sys
+import datetime
+import traceback
+
+# Try to import astral, handle missing dependency gracefully
+try:
+    from astral import LocationInfo
+    from astral.sun import sun
+    ASTRAL_AVAILABLE = True
+except ImportError:
+    ASTRAL_AVAILABLE = False
+
+def calculate_sun_times_astral(latitude, longitude, sunrise_offset=0, sunset_offset=0):
+    """Calculate sunrise and sunset times using astral library."""
+    # Get current date and timezone
+    today = datetime.datetime.now()
+    timezone = datetime.datetime.now().astimezone().tzinfo
+    
+    # Create location info
+    location = LocationInfo(
+        name="CustomLocation",
+        region="CustomRegion",
+        timezone=str(timezone),
+        latitude=float(latitude),
+        longitude=float(longitude)
+    )
+    
+    # Get sun information for today
+    s = sun(location.observer, date=today, tzinfo=timezone)
+    
+    # Extract sunrise and sunset times
+    sunrise = s["sunrise"]
+    sunset = s["sunset"]
+    
+    # Apply offsets
+    sunrise = sunrise + datetime.timedelta(minutes=int(sunrise_offset))
+    sunset = sunset + datetime.timedelta(minutes=int(sunset_offset))
+    
+    # Format times as HH:MM
+    sunrise_time = sunrise.strftime("%H:%M")
+    sunset_time = sunset.strftime("%H:%M")
+    
+    return sunrise_time, sunset_time
+
+def calculate_sun_times_fallback(latitude, longitude, sunrise_offset=0, sunset_offset=0):
+    """Fallback calculation method if astral is not available."""
+    import math
+    
+    # Convert latitude and longitude to radians
+    lat_rad = math.radians(float(latitude))
+    
+    # Get current date
+    today = datetime.datetime.now()
+    day_of_year = today.timetuple().tm_yday
+    
+    # Calculate solar declination (radians)
+    # Approximation from NOAA calculations
+    declination = 0.409 * math.sin(2 * math.pi / 365 * (day_of_year - 80))
+    
+    # Calculate day length (from sunrise to sunset) in hours
+    day_length = 24 - (24 / math.pi) * math.acos(
+        (math.sin(math.radians(-0.83)) + math.sin(lat_rad) * math.sin(declination)) /
+        (math.cos(lat_rad) * math.cos(declination))
+    )
+    
+    # Calculate noon offset due to longitude and time zone
+    tz_offset = datetime.datetime.now().astimezone().utcoffset().total_seconds() / 3600
+    longitude_correction = float(longitude) / 15 - tz_offset
+    
+    # Calculate approximate solar noon
+    solar_noon = 12 - longitude_correction
+    
+    # Calculate sunrise and sunset
+    sunrise = solar_noon - day_length / 2
+    sunset = solar_noon + day_length / 2
+    
+    # Apply offsets
+    sunrise += int(sunrise_offset) / 60
+    sunset += int(sunset_offset) / 60
+    
+    # Handle edge cases - truncate day_length to reasonable values
+    if not (4 <= day_length <= 20):
+        # Polar day/night or calculation error
+        # Use reasonable defaults based on season for central Europe
+        if 80 <= day_of_year <= 265:  # Spring and summer
+            sunrise, sunset = 5.5, 21.0
+        else:  # Fall and winter
+            sunrise, sunset = 7.0, 18.0
+    
+    # Format times
+    def format_time(hours):
+        # Handle hours wrap around
+        while hours < 0:
+            hours += 24
+        while hours >= 24:
+            hours -= 24
+        
+        # Convert decimal hours to hours:minutes format
+        h = int(hours)
+        m = int((hours - h) * 60)
+        return f"{h:02d}:{m:02d}"
+    
+    sunrise_time = format_time(sunrise)
+    sunset_time = format_time(sunset)
+    
+    return sunrise_time, sunset_time
+
+def calculate_sun_times(latitude, longitude, sunrise_offset=0, sunset_offset=0):
+    """Calculate sunrise and sunset times for the given location and date."""
+    try:
+        # Try to use astral if available
+        if ASTRAL_AVAILABLE:
+            return calculate_sun_times_astral(latitude, longitude, sunrise_offset, sunset_offset)
+        else:
+            # Print a notice about astral being unavailable
+            print("NOTICE: Using fallback calculation (astral not installed)", file=sys.stderr)
+            print("For better accuracy install astral: pip install astral", file=sys.stderr)
+            return calculate_sun_times_fallback(latitude, longitude, sunrise_offset, sunset_offset)
+    except Exception as e:
+        # If any calculation fails, use fallback
+        print(f"ERROR: {str(e)}", file=sys.stderr)
+        print(traceback.format_exc(), file=sys.stderr)
+        print("NOTICE: Calculation error, using seasonal defaults", file=sys.stderr)
+        
+        # Use seasonal defaults based on current month
+        month = datetime.datetime.now().month
+        if 3 <= month <= 10:  # Spring and summer
+            return "06:30", "20:00"
+        else:  # Fall and winter
+            return "07:30", "16:30"
+
+if __name__ == "__main__":
+    # Check arguments
+    if len(sys.argv) < 3:
+        print("Usage: sun_calculator.py LATITUDE LONGITUDE [SUNRISE_OFFSET SUNSET_OFFSET]")
+        sys.exit(1)
+    
+    # Parse arguments
+    latitude = sys.argv[1]
+    longitude = sys.argv[2]
+    sunrise_offset = sys.argv[3] if len(sys.argv) > 3 else 0
+    sunset_offset = sys.argv[4] if len(sys.argv) > 4 else 0
+    
+    # Calculate and output
+    source = "ASTRAL" if ASTRAL_AVAILABLE else "CALCULATED"
+    try:
+        sunrise, sunset = calculate_sun_times(latitude, longitude, sunrise_offset, sunset_offset)
+        print(f"{source} {sunrise} {sunset}")
+    except Exception as e:
+        print(f"ERROR: {str(e)}", file=sys.stderr)
+        print("DEFAULT 06:30 19:30")
+EOF
+    
+    # Make the script executable
+    chmod +x "$PYTHON_SCRIPT"
+    log "Python fallback calculator installed to $PYTHON_SCRIPT"
+    
+    # Try to install the astral package
+    if command -v pip3 &>/dev/null; then
+        log "Installing astral package..."
+        if pip3 install --user astral; then
+            log "Astral package installed successfully"
+        else
+            log "Warning: Failed to install astral package. Basic calculations will be used instead."
+        fi
+    else
+        log "Warning: pip3 not found. Cannot install astral package automatically. For better accuracy, install it manually: pip3 install astral"
+    fi
+    
+    # Test the script
+    if "$PYTHON_SCRIPT" "$LATITUDE" "$LONGITUDE" "$SUNRISE_OFFSET" "$SUNSET_OFFSET"; then
+        log "Fallback calculator test successful"
+    else
+        log "Warning: Fallback calculator test failed"
+    fi
 }
 
 # Parse command line arguments
@@ -182,9 +443,11 @@ case "$1" in
 --auto)
     schedule_theme_change >/dev/null
     ;;
+--install-fallback)
+    install_fallback
+    ;;
 *)
     show_help
-
     ;;
 esac
 
