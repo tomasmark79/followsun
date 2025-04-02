@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../../../.config/systemd/user"
+		},
+		{
+			"path": "../../../.config/followsun"
+		}
+	],
+	"settings": {}
+}
