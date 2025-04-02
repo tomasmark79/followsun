@@ -1,9 +1,9 @@
 [Unit]
-Description=Run FollowSun every 1 minutes
+Description=Run FollowSun every 5 minutes
 
 [Timer]
-OnBootSec=15sec
-OnUnitActiveSec=1min
+OnBootSec=30sec
+OnUnitActiveSec=5min
 Persistent=true
 
 [Install]
