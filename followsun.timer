@@ -1,5 +1,5 @@
 [Unit]
-Description=Run FollowSun every 1 minute
+Description=Run FollowSun in defined interval
 
 [Timer]
 OnBootSec=1min
