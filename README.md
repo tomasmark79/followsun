@@ -1,6 +1,8 @@
-# FollowSun - GNOME theme switcher based on sunrise/sunset
+# FollowSun
 
-# Usage
+GNOME theme switcher based on sunrise/sunset
+
+## Usage
 
 ```txt
 Usage: followsun.sh [OPTION]
@@ -8,27 +10,44 @@ Usage: followsun.sh [OPTION]
 Options:
   --help         Show this help
   --set-location <LAT> <LON> Set your latitude and longitude
-  --set-offset   <SUNRISE_OFFSET> <SUNSET_OFFSET>  Set offsets in minutes
+  --set-offset   <SUNRISE_OFFSET> <SUNSET_OFFSET> Set offsets in minutes
   --force-light  Force light theme
   --force-dark   Force dark theme
   --auto         Apply the appropriate theme based on current time
-  
+  --debug        Run with verbose debugging output
+
 Current configuration:
-  Location: 49.8682576, 14.2626625
+  Location: 49.1111, 14.9999
   Sunrise offset: 0 minutes
   Sunset offset: 0 minutes
 
+Note: For offline sun calculation, place a sun_calculator.py script in the same
+      directory as this script. It should accept latitude, longitude, and offsets
+      as parameters and output 'SOURCE HH:MM HH:MM' for sunrise and sunset.
 ```
 
-# Systemd Service
+# Automatisation
 
-Systemd timer bude spouštět v zadaném intervalu `followsun.sh`. Edit, and copy `followsun.service` and `followsun.timer` to the destination `~/.config/systemd/user/`. Afterwards enable and start systemd service and timer.
+service 
 
 ```bash
 systemctl --user enable followsun.service
 systemctl --user start followsun.service
+systemctl --user status followsun.service
+```
+
+timer for service (instead of cron)
+
+```bash
 systemctl --user enable followsun.timer
 systemctl --user start followsun.timer
+systemctl --user status followsun.timer
+systemctl --user list-timers
+```
+
+reload if we did changes within files
+
+```bash
 systemctl --user daemon-reload
 ```
 
