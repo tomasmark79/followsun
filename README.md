@@ -17,7 +17,7 @@ Options:
   --debug        Run with verbose debugging output
 
 Current configuration:
-  Location: 49.86396819090531, 14.265802152828646
+  Location: 49.1111, 14.9999
   Sunrise offset: 0 minutes
   Sunset offset: 0 minutes
 
