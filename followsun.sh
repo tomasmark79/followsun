@@ -34,7 +34,11 @@ source "$CONFIG_FILE"
 # Function to log messages
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >>"$CONFIG_DIR/followsun.log"
-    echo "$1"
+    if [ "$DEBUG_MODE" = "true" ]; then
+        echo "[DEBUG] $1"
+    else
+        echo "$1"
+    fi
 }
 
 # Function to set light theme
@@ -65,7 +69,7 @@ get_sun_times() {
     # Try to get sun times from API first
     local API_URL="https://api.sunrise-sunset.org/json?lat=$LATITUDE&lng=$LONGITUDE&date=$TODAY&formatted=0"
     local SUN_DATA=$(curl -s --connect-timeout 5 "$API_URL")
-    
+
     # Check if API call was successful
     if [[ "$SUN_DATA" == *"\"status\":\"OK\""* ]]; then
         # Extract times (in UTC)
@@ -75,14 +79,14 @@ get_sun_times() {
         # Convert to local time and apply offset
         SUNRISE_LOCAL=$(date -d "$SUNRISE $SUNRISE_OFFSET minutes" +"%H:%M")
         SUNSET_LOCAL=$(date -d "$SUNSET $SUNSET_OFFSET minutes" +"%H:%M")
-        
+
         # Save to cache
-        echo "$SUNRISE_LOCAL $SUNSET_LOCAL $TODAY" > "$CONFIG_DIR/sun_cache"
+        echo "$SUNRISE_LOCAL $SUNSET_LOCAL $TODAY" >"$CONFIG_DIR/sun_cache"
         log "Sun times from API: Sunrise: $SUNRISE_LOCAL, Sunset: $SUNSET_LOCAL"
     else
         # API failed, try Python script fallback
         log "Warning: Could not fetch sun times from API. Using fallback calculation."
-        
+
         # Check if Python script exists
         local PYTHON_SCRIPT="$SCRIPT_DIR/sun_calculator.py"
         if [[ -f "$PYTHON_SCRIPT" && -x "$PYTHON_SCRIPT" ]]; then
@@ -92,18 +96,18 @@ get_sun_times() {
                 local SOURCE=$(echo "$FALLBACK_RESULT" | cut -d' ' -f1)
                 SUNRISE_LOCAL=$(echo "$FALLBACK_RESULT" | cut -d' ' -f2)
                 SUNSET_LOCAL=$(echo "$FALLBACK_RESULT" | cut -d' ' -f3)
-                
+
                 log "Using $SOURCE sun times: Sunrise: $SUNRISE_LOCAL, Sunset: $SUNSET_LOCAL"
-                
+
                 # Save to cache
-                echo "$SUNRISE_LOCAL $SUNSET_LOCAL $TODAY" > "$CONFIG_DIR/sun_cache"
+                echo "$SUNRISE_LOCAL $SUNSET_LOCAL $TODAY" >"$CONFIG_DIR/sun_cache"
             else
                 log "Python 3 not found. Checking for cached values."
             fi
         else
             log "Fallback script not found. Checking for cached values."
         fi
-        
+
         # If we don't have values yet, try the cache
         if [[ -z "$SUNRISE_LOCAL" || -z "$SUNSET_LOCAL" ]]; then
             if [[ -f "$CONFIG_DIR/sun_cache" ]]; then
@@ -116,7 +120,7 @@ get_sun_times() {
                 fi
             fi
         fi
-        
+
         # If we still don't have values, use reasonable defaults for central Europe
         if [[ -z "$SUNRISE_LOCAL" || -z "$SUNSET_LOCAL" ]]; then
             local MONTH=$(date +%m)
@@ -134,37 +138,84 @@ get_sun_times() {
         fi
     fi
 
+    # Clean up and normalize output format
+    SUNRISE_LOCAL=$(echo "$SUNRISE_LOCAL" | tr -d '\n')
+    SUNSET_LOCAL=$(echo "$SUNSET_LOCAL" | tr -d '\n')
+
     echo "$SUNRISE_LOCAL $SUNSET_LOCAL"
 }
 
 # Function to calculate next theme change
 schedule_theme_change() {
     local SUN_TIMES=$(get_sun_times)
-    local SUNRISE=$(echo "$SUN_TIMES" | cut -d' ' -f1)
-    local SUNSET=$(echo "$SUN_TIMES" | cut -d' ' -f2)
+    
+    # More thorough cleanup of the times
+    local SUNRISE=$(echo "$SUN_TIMES" | cut -d' ' -f1 | tr -d '\n' | tr -d '\r' | sed 's/\[DEBUG\]//g')
+    local SUNSET=$(echo "$SUN_TIMES" | cut -d' ' -f2 | tr -d '\n' | tr -d '\r' | sed 's/Sun//g')
 
     local CURRENT_TIME=$(date +"%H:%M")
 
     log "Current time: $CURRENT_TIME, Sunrise: $SUNRISE, Sunset: $SUNSET"
 
-    # Determine current expected theme
-    if [[ "$CURRENT_TIME" > "$SUNRISE" && "$CURRENT_TIME" < "$SUNSET" ]]; then
+    # Extract hours and minutes with safer parsing
+    local CT_HOUR=$(echo "$CURRENT_TIME" | cut -d':' -f1)
+    local CT_MIN=$(echo "$CURRENT_TIME" | cut -d':' -f2)
+    local SR_HOUR=$(echo "$SUNRISE" | cut -d':' -f1)
+    local SR_MIN=$(echo "$SUNRISE" | cut -d':' -f2)
+    local SS_HOUR=$(echo "$SUNSET" | cut -d':' -f1)
+    local SS_MIN=$(echo "$SUNSET" | cut -d':' -f2)
+    
+    # Ensure we're working with clean numbers and remove leading zeros
+    CT_HOUR=$(echo "$CT_HOUR" | sed 's/[^0-9]//g' | sed 's/^0*//')
+    CT_MIN=$(echo "$CT_MIN" | sed 's/[^0-9]//g' | sed 's/^0*//')
+    SR_HOUR=$(echo "$SR_HOUR" | sed 's/[^0-9]//g' | sed 's/^0*//')
+    SR_MIN=$(echo "$SR_MIN" | sed 's/[^0-9]//g' | sed 's/^0*//')
+    SS_HOUR=$(echo "$SS_HOUR" | sed 's/[^0-9]//g' | sed 's/^0*//')
+    SS_MIN=$(echo "$SS_MIN" | sed 's/[^0-9]//g' | sed 's/^0*//')
+    
+    # Default to 0 if empty (for example, if hours is "00")
+    CT_HOUR=${CT_HOUR:-0}
+    CT_MIN=${CT_MIN:-0}
+    SR_HOUR=${SR_HOUR:-0}
+    SR_MIN=${SR_MIN:-0}
+    SS_HOUR=${SS_HOUR:-0}
+    SS_MIN=${SS_MIN:-0}
+    
+    # Convert to minutes since midnight with safer arithmetic
+    local CT_MINUTES=$((CT_HOUR * 60 + CT_MIN))
+    local SR_MINUTES=$((SR_HOUR * 60 + SR_MIN))
+    local SS_MINUTES=$((SS_HOUR * 60 + SS_MIN))
+
+    log "Time in minutes - Current: $CT_MINUTES, Sunrise: $SR_MINUTES, Sunset: $SS_MINUTES"
+
+    # Determine current expected theme using numeric comparison
+    if [[ $CT_MINUTES -ge $SR_MINUTES && $CT_MINUTES -lt $SS_MINUTES ]]; then
         # It's daytime
+        log "Time comparison: ($CT_MINUTES >= $SR_MINUTES) && ($CT_MINUTES < $SS_MINUTES) = true (daytime)"
         set_light_theme
         # Schedule next change at sunset
         local NEXT_CHANGE=$SUNSET
     else
         # It's nighttime
+        log "Time comparison: ($CT_MINUTES >= $SR_MINUTES) && ($CT_MINUTES < $SS_MINUTES) = false (nighttime)"
+        if [[ $CT_MINUTES -lt $SR_MINUTES ]]; then
+            log "Time is before sunrise"
+        elif [[ $CT_MINUTES -ge $SS_MINUTES ]]; then
+            log "Time is after sunset"
+        else
+            log "Unexpected condition in time comparison"
+        fi
+
         set_dark_theme
         # Schedule next change at sunrise (possibly tomorrow)
         local NEXT_CHANGE=$SUNRISE
         # If we already passed sunrise today, schedule for tomorrow
-        if [[ "$CURRENT_TIME" < "$SUNSET" ]]; then
+        if [[ $CT_MINUTES -lt $SS_MINUTES ]]; then
             # Try API first for tomorrow's sunrise
             local TOMORROW=$(date -d "tomorrow" +"%Y-%m-%d")
             local API_URL="https://api.sunrise-sunset.org/json?lat=$LATITUDE&lng=$LONGITUDE&date=$TOMORROW&formatted=0"
             local SUN_DATA=$(curl -s --connect-timeout 5 "$API_URL")
-            
+
             if [[ "$SUN_DATA" == *"\"status\":\"OK\""* ]]; then
                 local SUNRISE_TOMORROW=$(echo "$SUN_DATA" | grep -o '"sunrise":"[^"]*"' | cut -d'"' -f4)
                 NEXT_CHANGE=$(date -d "$SUNRISE_TOMORROW $SUNRISE_OFFSET minutes" +"%H:%M")
@@ -193,6 +244,7 @@ show_help() {
     echo "  --force-dark   Force dark theme"
     echo "  --auto         Apply the appropriate theme based on current time"
     echo "  --install-fallback Install Python fallback calculator"
+    echo "  --debug        Run with verbose debugging output"
     echo ""
     echo "Current configuration:"
     echo "  Location: $LATITUDE, $LONGITUDE"
@@ -215,15 +267,15 @@ EOF
 # Function to install Python fallback script
 install_fallback() {
     local PYTHON_SCRIPT="$SCRIPT_DIR/sun_calculator.py"
-    
+
     # Check if Python 3 is installed
     if ! command -v python3 &>/dev/null; then
         log "Error: Python 3 is required for the fallback calculator but not installed"
         exit 1
     fi
-    
+
     # Create the Python script
-    cat > "$PYTHON_SCRIPT" <<"EOF"
+    cat >"$PYTHON_SCRIPT" <<"EOF"
 #!/usr/bin/env python3
 """
 Sun Calculator - Calculate sunrise and sunset times for a given location
@@ -382,11 +434,11 @@ if __name__ == "__main__":
         print(f"ERROR: {str(e)}", file=sys.stderr)
         print("DEFAULT 06:30 19:30")
 EOF
-    
+
     # Make the script executable
     chmod +x "$PYTHON_SCRIPT"
     log "Python fallback calculator installed to $PYTHON_SCRIPT"
-    
+
     # Try to install the astral package
     if command -v pip3 &>/dev/null; then
         log "Installing astral package..."
@@ -398,7 +450,7 @@ EOF
     else
         log "Warning: pip3 not found. Cannot install astral package automatically. For better accuracy, install it manually: pip3 install astral"
     fi
-    
+
     # Test the script
     if "$PYTHON_SCRIPT" "$LATITUDE" "$LONGITUDE" "$SUNRISE_OFFSET" "$SUNSET_OFFSET"; then
         log "Fallback calculator test successful"
@@ -408,6 +460,7 @@ EOF
 }
 
 # Parse command line arguments
+DEBUG_MODE="false"
 case "$1" in
 --help)
     show_help
@@ -442,6 +495,11 @@ case "$1" in
     ;;
 --auto)
     schedule_theme_change >/dev/null
+    ;;
+--debug)
+    DEBUG_MODE="true"
+    echo "[DEBUG] Debug mode enabled"
+    schedule_theme_change
     ;;
 --install-fallback)
     install_fallback
