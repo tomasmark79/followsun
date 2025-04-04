@@ -30,9 +30,8 @@ Note: For offline sun calculation, place a sun_calculator.py script in the same
 
 > 💡 change user
 
-```bash
 `vim /lib/systemd/system-sleep/followsun-wakeup`
-```
+
 ```bash
 #!/bin/bash
 case $1 in
