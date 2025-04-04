@@ -26,9 +26,27 @@ Note: For offline sun calculation, place a sun_calculator.py script in the same
       as parameters and output 'SOURCE HH:MM HH:MM' for sunrise and sunset.
 ```
 
-# Automatisation
+## Automatic switch after wake up from suspend
 
-service 
+> 💡 change user
+
+```bash
+`vim /lib/systemd/system-sleep/followsun-wakeup`
+```
+```bash
+#!/bin/bash
+case $1 in
+  post)
+    su tomas -c "XDG_RUNTIME_DIR=/run/user/$(id -u tomas) systemctl --user start followsun.service"
+    ;;
+esac
+````
+
+`sudo chmod +x /lib/systemd/system-sleep/followsun-wakeup`
+
+## systemd service and timer for auto change theme
+
+### service 
 
 ```bash
 systemctl --user enable followsun.service
@@ -36,7 +54,7 @@ systemctl --user start followsun.service
 systemctl --user status followsun.service
 ```
 
-timer for service (instead of cron)
+### timer for service (instead of deprecated cron solution)
 
 ```bash
 systemctl --user enable followsun.timer
@@ -45,15 +63,16 @@ systemctl --user status followsun.timer
 systemctl --user list-timers
 ```
 
-reload if we did changes within files
+### reload if we did changes within files
 
 ```bash
 systemctl --user daemon-reload
 ```
 
-logs
+### logs
 
 ```bash
+journalctl --user-unit=followsun.service
 journalctl --user-unit=followsun.timer
 ```
 
