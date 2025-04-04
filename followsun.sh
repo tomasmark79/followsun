@@ -2,6 +2,9 @@
 # followsun - script to switch GNOME theme based on sunrise/sunset
 # Automatically switches between light and dark mode
 
+# MIT License
+# Copyright (c) 2025 Tomáš Mark
+
 # Default location (Prague, CZ)
 DEFAULT_LAT="50.0755"
 DEFAULT_LON="14.4378"

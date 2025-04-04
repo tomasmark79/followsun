@@ -4,6 +4,9 @@ Sun Calculator - Calculate sunrise and sunset times for a given location
 Used by followsun.sh when internet connection is unavailable
 """
 
+# MIT License
+# Copyright (c) 2024-2025 Tomáš Mark
+
 import sys
 import datetime
 from zoneinfo import ZoneInfo
