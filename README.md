@@ -26,11 +26,11 @@ Note: For offline sun calculation, place a sun_calculator.py script in the same
       as parameters and output 'SOURCE HH:MM HH:MM' for sunrise and sunset.
 ```
 
-## Automatic switch after wake up from suspend
+## Start followsun.service after wake up from suspend
 
 > 💡 change user
 
-`vim /lib/systemd/system-sleep/followsun-wakeup`
+`sudo vim /lib/systemd/system-sleep/followsun-wakeup`
 
 ```bash
 #!/bin/bash
@@ -43,7 +43,7 @@ esac
 
 `sudo chmod +x /lib/systemd/system-sleep/followsun-wakeup`
 
-## systemd service and timer for auto change theme
+## Systemd service and timer for theme switching
 
 ### service 
 
