@@ -123,8 +123,8 @@ def calculate_sun_times(latitude, longitude, sunrise_offset=0, sunset_offset=0):
             return calculate_sun_times_astral(latitude, longitude, sunrise_offset, sunset_offset)
         else:
             # Print a notice about astral being unavailable
-            print("NOTICE: Using fallback calculation (astral not installed)", file=sys.stderr)
-            print("For better accuracy install astral: pip install astral", file=sys.stderr)
+            # print("NOTICE: Using fallback calculation (astral not installed)", file=sys.stderr)
+            # print("For better accuracy install astral: pip install astral", file=sys.stderr)
             return calculate_sun_times_fallback(latitude, longitude, sunrise_offset, sunset_offset)
     except Exception as e:
         # If any calculation fails, use fallback

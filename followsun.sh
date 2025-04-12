@@ -34,11 +34,11 @@ fi
 # Source the config file
 source "$CONFIG_FILE"
 
-# Function to log messages
+
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >>"$CONFIG_DIR/followsun.log"
     if [ "$DEBUG_MODE" = "true" ]; then
-        echo "[DEBUG] $1"
+        echo "[DEBUG] $1" >&2  # Ladicí zprávy na stderr
     else
         echo "$1"
     fi
@@ -105,14 +105,15 @@ get_sun_times() {
 
         # Check if external calculator exists
         local PYTHON_SCRIPT="$SCRIPT_DIR/sun_calculator.py"
-        if [[ -f "$PYTHON_SCRIPT" && -x "$PYTHON_SCRIPT" ]]; then
+        if [[ -f "$PYTHON_SCRIPT" ]]; then
             # Call the external calculator
             if command -v python3 &>/dev/null; then
                 log "Using external Python calculator"
                 local FALLBACK_RESULT=$("$PYTHON_SCRIPT" "$LATITUDE" "$LONGITUDE" "$SUNRISE_OFFSET" "$SUNSET_OFFSET")
-                local SOURCE=$(echo "$FALLBACK_RESULT" | cut -d' ' -f1)
-                SUNRISE_LOCAL=$(echo "$FALLBACK_RESULT" | cut -d' ' -f2)
-                SUNSET_LOCAL=$(echo "$FALLBACK_RESULT" | cut -d' ' -f3)
+
+                local SOURCE=$(echo "$FALLBACK_RESULT" | awk '{print $1}')
+                SUNRISE_LOCAL=$(echo "$FALLBACK_RESULT" | awk '{print $2}')
+                SUNSET_LOCAL=$(echo "$FALLBACK_RESULT" | awk '{print $3}')
 
                 log "Using $SOURCE sun times: Sunrise: $SUNRISE_LOCAL, Sunset: $SUNSET_LOCAL"
 
@@ -156,11 +157,12 @@ get_sun_times() {
 
 # Function to calculate next theme change
 schedule_theme_change() {
+    
     local SUN_TIMES=$(get_sun_times)
     
-    # More thorough cleanup of the times
-    local SUNRISE=$(echo "$SUN_TIMES" | cut -d' ' -f1 | tr -d '\n' | tr -d '\r' | sed 's/\[DEBUG\]//g')
-    local SUNSET=$(echo "$SUN_TIMES" | cut -d' ' -f2 | tr -d '\n' | tr -d '\r' | sed 's/Sun//g')
+    # Clean up and extract sunrise and sunset times
+    local SUNRISE=$(echo "$SUN_TIMES" | awk '{print $1}')
+    local SUNSET=$(echo "$SUN_TIMES" | awk '{print $2}')
 
     local CURRENT_TIME=$(date +"%H:%M")
 
@@ -315,7 +317,7 @@ case "$1" in
     ;;
 --debug)
     DEBUG_MODE="true"
-    echo "[DEBUG] Debug mode enabled"
+    #echo "[DEBUG] Debug mode enabled"
     schedule_theme_change
     ;;
 *)
