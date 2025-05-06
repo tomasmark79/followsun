@@ -37,8 +37,8 @@ source "$CONFIG_FILE"
 
 log() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >>"$CONFIG_DIR/followsun.log"
-    if [ "$DEBUG_MODE" = "true" ]; then
-        echo "[DEBUG] $1" >&2  # Ladicí zprávy na stderr
+    if [ "$VERBOSE_MODE" = "true" ]; then
+        echo "[VERBOSE] $1" >&2  # Ladicí zprávy na stderr
     else
         echo "$1"
     fi
@@ -254,7 +254,7 @@ show_help() {
     echo "  --force-light  Force light theme"
     echo "  --force-dark   Force dark theme"
     echo "  --auto         Apply the appropriate theme based on current time"
-    echo "  --debug        Run with verbose debugging output"
+    echo "  --verbose      Run with verbose debugging output"
     echo ""
     echo "Current configuration:"
     echo "  Location: $LATITUDE, $LONGITUDE"
@@ -279,7 +279,7 @@ EOF
 }
 
 # Parse command line arguments
-DEBUG_MODE="false"
+VERBOSE_MODE="false"
 case "$1" in
 --help)
     show_help
@@ -315,9 +315,9 @@ case "$1" in
 --auto)
     schedule_theme_change >/dev/null
     ;;
---debug)
-    DEBUG_MODE="true"
-    #echo "[DEBUG] Debug mode enabled"
+--verbose)
+    VERBOSE_MODE="true"
+    #echo "[VERBOSE] Verbose mode enabled"
     schedule_theme_change
     ;;
 *)

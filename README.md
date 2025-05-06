@@ -14,7 +14,7 @@ Options:
   --force-light  Force light theme
   --force-dark   Force dark theme
   --auto         Apply the appropriate theme based on current time
-  --debug        Run with verbose debugging output
+  --verbose      Run with verbose debugging output
 
 Current configuration:
   Location: 49.1111, 14.9999
