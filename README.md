@@ -26,34 +26,19 @@ Note: For offline sun calculation, place a sun_calculator.py script in the same
       as parameters and output 'SOURCE HH:MM HH:MM' for sunrise and sunset.
 ```
 
-## Start followsun.service after wake up from suspend
+## Systemd Service `followsun.service` is triggered by Systemd Timer `followsun.timer`
 
-> 💡 change user
+### copy and edit as you wish both to
 
-`sudo vim /lib/systemd/system-sleep/followsun-wakeup`
+`~/.config/systemd/user`
 
-```bash
-#!/bin/bash
-case $1 in
-  post)
-    su tomas -c "XDG_RUNTIME_DIR=/run/user/$(id -u tomas) systemctl --user start followsun.service"
-    ;;
-esac
-````
-
-`sudo chmod +x /lib/systemd/system-sleep/followsun-wakeup`
-
-## Systemd service and timer for theme switching
-
-### service 
+### then 
 
 ```bash
-systemctl --user enable followsun.service
-systemctl --user start followsun.service
-systemctl --user status followsun.service
+systemctl --user daemon-reload
 ```
 
-### timer for service (instead of deprecated cron solution)
+### enable and start timer
 
 ```bash
 systemctl --user enable followsun.timer
@@ -62,17 +47,26 @@ systemctl --user status followsun.timer
 systemctl --user list-timers
 ```
 
-### reload if we did changes within files
+### enable and start service 
 
 ```bash
-systemctl --user daemon-reload
+systemctl --user start followsun.service
+systemctl --user status followsun.service
 ```
 
-### logs
+### systemd logs
 
 ```bash
 journalctl --user-unit=followsun.service
 journalctl --user-unit=followsun.timer
 ```
+
+### bash script `followsun.sh` and python helper `sun_calculator.py`
+
+Make sure these two files are located in the directory specified path in the  Systemd Service file.
+
+---
+
+Due to issues with running the script immediately after the computer wakes from sleep, I have permanently removed this script from the repository and instead reduced the timer interval for Systemd Service.
 
 
