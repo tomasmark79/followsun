@@ -1,5 +1,5 @@
 [Unit]
-Description= FollowSun The GNOME theme switcher based on sunrise/sunset
+Description=FollowSun The GNOME theme switcher based on sunrise/sunset
 After=graphical-session.target
 PartOf=graphical-session.target
 

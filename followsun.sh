@@ -1,7 +1,6 @@
 #!/bin/bash
-# followsun - script to switch GNOME theme based on sunrise/sunset
-# Automatically switches between light and dark mode
 
+# FollowSun The GNOME theme switcher based on sunrise/sunset
 # MIT License
 # Copyright (c) 2025 Tomáš Mark
 
@@ -83,6 +82,7 @@ get_sun_times() {
     local TODAY=$(date +"%Y-%m-%d")
 
     # Try to get sun times from API first
+    log "Starting curl"
     local API_URL="https://api.sunrise-sunset.org/json?lat=$LATITUDE&lng=$LONGITUDE&date=$TODAY&formatted=0"
     local SUN_DATA=$(curl -s --connect-timeout 5 "$API_URL")
 
